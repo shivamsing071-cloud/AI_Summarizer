@@ -1,5 +1,6 @@
 from openai import OpenAI
 from dotenv import load_dotenv
+from newspaper import Article
 import json
 import os
 
@@ -39,27 +40,54 @@ Return exactly this schema:
     "category":""
 }
 """
+mode = input("Enter 'url' or 'text': ").strip().lower()
 
-print("Paste your article (press Enter twice to finish):")
+if mode == "url":
+    url = input("Enter article URL: ")
 
-lines = []
+    try:
+        article = Article(url)
+        article.download()
+        article.parse()
+    except Exception as e:
+        print("Failed to extract article:")
+        print(e)
+        exit()
 
-while True:
-    line = input()
+    if not article.text.strip():
+        print("No article content found.")
+        exit()
 
-    if line == "":
-        break
+    # print("\nExtracted Title: ")
+    # print(article.title)
+    # print("\nExtracted Text: ")
+    # print(article.text[:500])
+    # print("...")
 
-    lines.append(line)
+    article_text = article.text
 
-article = "\n".join(lines)
+
+else:
+    print("Paste your article (press Enter twice to finish):")
+
+    lines = []
+
+    while True:
+        line = input()
+
+        if line == "":
+            break
+
+        lines.append(line)
+
+    article_text = "\n".join(lines)
 
 try:
     completion = client.chat.completions.create(
         model="nvidia/nemotron-3-ultra-550b-a55b",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": article},
+            {"role": "user", "content": article_text},
         ],
         response_format={"type":"json_object"},
         temperature=0.2,
@@ -84,22 +112,22 @@ except json.JSONDecodeError:
     exit()
 
 print("\nTitle: ")
-print(data["title"])
+print(data.get("title", "N/A"))
 
 print("\nSummary: ")
-print(data["summary"])
+print(data.get("summary", "N/A"))
 
 print("\nKey Points: ")
-for point in data["key_points"]:
+for point in data.get("key_points", []):
     print("-", point)
 
 print("\nSentiment: ")
-print(data["sentiment"])
+print(data.get("sentiment", "N/A"))
 
 print("\nCategory: ")
-print(data["category"])
+print(data.get("category", "N/A"))
 
-word_count = len(article.split())
+word_count = len(article_text.split())
 reading_time = max(1, round(word_count / 200))
 
 print("\nEstimated Reading Time: ")
