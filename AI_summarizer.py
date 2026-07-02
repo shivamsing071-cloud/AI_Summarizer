@@ -1,37 +1,68 @@
 from openai import OpenAI
 from dotenv import load_dotenv
+import json
 import os
 
 load_dotenv()
-
-user_input = input("You: ")
 
 client = OpenAI(
     base_url="https://integrate.api.nvidia.com/v1",
     api_key=os.getenv("NVIDIA_API_KEY")
 )
 
+SYSTEM_PROMPT = """
+You are an expert article summarizer.
+
+Return ONLY valid JSON.
+
+{
+    "title":"",
+    "summary":"",
+    "key_points":[],
+    "sentiment":"",
+    "category":""
+}
+"""
+
+print("Paste your article (press Enter twice to finish):")
+
+lines = []
+
+while True:
+    line = input()
+
+    if line == "":
+        break
+
+    lines.append(line)
+
+article = "\n".join(lines)
+
 completion = client.chat.completions.create(
     model="nvidia/nemotron-3-ultra-550b-a55b",
     messages=[
-        {
-            "role": "user",
-            "content": user_input
-        }
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": article},
     ],
-    temperature=1.0,
-    top_p=0.95,
-    max_tokens=16384,
-    stream=True
+    temperature=0.2,
 )
 
-print("\nAssistant: ", end="")
+response = completion.choices[0].message.content
 
-for chunk in completion:
-    if not chunk.choices:
-        continue
+data = json.loads(response)
 
-    if chunk.choices[0].delta.content is not None:
-        print(chunk.choices[0].delta.content, end="")
+print("\nTitle: ")
+print(data["title"])
 
-print()
+print("\nSummary: ")
+print(data["summary"])
+
+print("\nKey Points: ")
+for point in data["key_points"]:
+    print("-", point)
+
+print("\nSentiment: ")
+print(data["sentiment"])
+
+print("\nCategory: ")
+print(data["category"])
